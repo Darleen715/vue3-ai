@@ -2,5 +2,5 @@
 </script>
 
 <template>
-  <el-button type="primary">I am ElButton</el-button>
+  <router-view></router-view>
 </template>
