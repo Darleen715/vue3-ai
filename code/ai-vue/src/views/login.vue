@@ -36,8 +36,10 @@
 <script setup>
 import { ref, reactive } from 'vue'
 import { login } from '@/api/admin'
+import { useRouter } from 'vue-router'
 
 const ruleFormRef = ref()
+const router = useRouter()
 
 const formData = reactive({
     username: '',
@@ -68,6 +70,14 @@ const submitForm = async (formEl) => {
                 // 登陆成功，保存token和用户信息
                 localStorage.setItem('token', data.token)
                 localStorage.setItem('userInfo', JSON.stringify(data.userInfo))
+
+                // 根据用户角色跳转的路径
+                if (data.userInfo.userType === 2) {
+                    router.push('/back/dashboard')
+                } else {
+
+                }
+
             })
         }
     })
