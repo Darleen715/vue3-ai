@@ -1,5 +1,5 @@
 <template>
-    <el-dialog title="文章详情" v-model="dialogVisible" width="50%" @close="handleClose">
+    <el-dialog :title="isEdit ? '编辑文章' : '新增文章'" v-model="dialogVisible" width="50%" @close="handleClose">
         <el-form :model="formData" :rules="rules" ref="formRef" label-width="120px">
             <el-form-item label="文章标题" prop="title">
                 <el-input v-model="formData.title" placeholder="请输入文章标题" maxlength="200" show-word-limit clearable>
@@ -47,19 +47,18 @@
             <div v-html="formData.content"></div>
         </div>
         <template #footer>
-            <el-button type="primary" @click="btnPreview = !btnPreview">{{ btnPreview ? '隐藏预览' : '预览效果' }}</el-button>
-            <el-button type="primary" @click="handleClose">取消</el-button>
-            <el-button type="primary" @click="handleSubmit()" :loading="loading">创建文章</el-button>
-
+            <el-button @click="btnPreview = !btnPreview">{{ btnPreview ? '隐藏预览' : '预览效果' }}</el-button>
+            <el-button @click="handleClose">取消</el-button>
+            <el-button type="primary" @click="handleSubmit()" :loading="loading">{{ isEdit ? '更新文章' : '创建文章'
+            }}</el-button>
         </template>
-
     </el-dialog>
 </template>
 
 
 <script setup>
-import { ref, computed, reactive, nextTick } from 'vue'
-import { uploadFile, createArticle } from '@/api/admin'
+import { ref, computed, reactive, nextTick, watch } from 'vue'
+import { uploadFile, createArticle, updateArticle } from '@/api/admin'
 import { fileBaseUrl } from '../config'
 import RichTextEditor from './RichTextEditor.vue'
 
@@ -71,10 +70,43 @@ const props = defineProps({
     categories: {
         type: Array,
         default: () => []
+    },
+    article: {
+        type: Object,
+        default: null
     }
 })
-const handleClose = () => {
 
+// 根据文章的id是否存在来判断当前是编辑还是新增
+const isEdit = computed(() => { return !!props.article?.id })
+
+// 监听编辑数据
+watch(() => props.article, (newVal) => {
+    console.log(newVal, 'newVal');
+
+    if (newVal) {
+        nextTick(() => {
+            // 对象属性的合并，可做浅拷贝
+            Object.assign(formData, newVal)
+            // 使用现有id
+            businessId.value = newVal.id
+            // 使用现有封面图片
+            imgUrl.value = `${fileBaseUrl}${newVal.coverImage}`
+        })
+    }
+})
+
+
+const handleClose = () => {
+    // 重置表单
+    formRef.value.resetFields()
+    businessId.value = null
+    // 重置标签
+    formData.tagArray = []
+    // 重置封面图片和数据
+    handleRemove()
+    // 关闭弹窗
+    emit('update:modelValue', false)
 }
 
 const emit = defineEmits(['update:modelValue', 'success'])
@@ -141,11 +173,13 @@ const beforeUpload = (file) => {
 
     return true
 }
+
+const businessId = ref(null)
 const handleUploadRequest = async ({ file }) => {
     // UUID生成
-    const businessId = crypto.randomUUID() // 业务ID
+    businessId.value = crypto.randomUUID() // 业务ID
     const fileRes = await uploadFile(file, {
-        businessId: businessId,
+        businessId: businessId.value,
     })
     console.log(fileRes)
     // 拼接完整的图片地址
@@ -161,10 +195,12 @@ const handleRemove = () => {
 // 富文本
 const handleContentChange = (data) => {
     formData.content = data.html
-
 }
 const editorInstance = ref(null)
 const handleEditorCreated = (editor) => {
+    editorInstance.value = editor
+
+    // 创建完成后要做的事情
     if (formData.content && editor) {
         nextTick(() => {
             editor.setHtml(formData.content)
@@ -178,6 +214,8 @@ const btnPreview = ref(false)
 const formRef = ref()
 const loading = ref(false)
 const handleSubmit = () => {
+    console.log(formRef.value, 'formRef');
+
     formRef.value.validate((valid, fields) => {
         if (valid) {
             loading.value = true
@@ -192,11 +230,21 @@ const handleSubmit = () => {
 
         delete submitData.tagArray
 
+        if (!isEdit.value) {
+            // 新增
+            submitData.id = businessId.value
+            createArticle(submitData).then(res => {
+                loading.value = false
+                emit('success')
+            })
+        } else {
+            updateArticle(props.article.id, submitData).then(res => {
+                loading.value = false
+                emit('success')
+            })
+        }
 
-        createArticle(submitData).then(res => {
-            loading.value = false
-            emit('success')
-        })
+
     })
 }
 
