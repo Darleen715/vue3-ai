@@ -1,11 +1,13 @@
 import { createRouter, createWebHistory } from "vue-router";
 import BackendLayout from "@/components/BackendLayout.vue";
 import AuthLayout from "@/components/AuthLayout.vue";
+import FrontendLayout from "../components/FrontendLayout.vue";
 
 // 路由配置
 const backendRoutes = [
   {
     path: "/back",
+    redirect: "/back/dashboard",
     component: BackendLayout,
     children: [
       {
@@ -64,9 +66,47 @@ const backendRoutes = [
   },
 ];
 
+const frontendRoutes = [
+  {
+    path: "/",
+    component: FrontendLayout,
+    children: [],
+  },
+];
+
 const router = createRouter({
   history: createWebHistory(),
-  routes: backendRoutes,
+  routes: [...backendRoutes, ...frontendRoutes],
+});
+
+// 路由前置守卫
+router.beforeEach((to, from, next) => {
+  // 如果需要登录权限，可以在这里检查用户是否登录
+  const token = localStorage.getItem("token");
+  const userInfo = JSON.parse(localStorage.getItem("userInfo")); // 获取用户类型
+
+  // 判断当前用户是否登录
+  if (token) {
+    // 后台用户
+    if (userInfo.userType == 2) {
+      if (to.path.startsWith("/back")) {
+        next();
+      } else {
+        next("/back/dashboard");
+      }
+    } else if (userInfo.userType == 1) {
+      // 前台用户的首页重定向
+    }
+  } else {
+    // 当前用户未登录
+    if (to.path.startsWith("/back")) {
+      // 访问后台页面则跳转到登录页
+      next("/auth/login");
+    } else {
+      // 访问其他页面则正常跳转
+      next();
+    }
+  }
 });
 
 export default router;
